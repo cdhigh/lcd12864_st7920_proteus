@@ -9,10 +9,10 @@
 * 支持绘图和自定义字符（GDRAM/CGRAM）
 * 支持图文混排，和实际模块处理一致，图文重叠的像素将使用异或方法显示
 
-![ScreenShoot1](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/master/scr1.png)
-![ScreenShoot2](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/master/scr2.png)
-![ScreenShoot3](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/master/scr3.png)
-![Screen GIF](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/master/scrShoot.gif)
+![ScreenShoot1](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/main/scr1.png)
+![ScreenShoot2](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/main/scr2.png)
+![ScreenShoot3](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/main/scr3.png)
+![Screen GIF](https://github.com/cdhigh/lcd12864_st7920_proteus/blob/main/scrShoot.gif)
 
 ## 使用方法  
 * 将 release/MODELS/LCD12864B.DLL 拷贝到 proteus 的 MODELS 目录
