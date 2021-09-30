@@ -70,7 +70,6 @@ int main(void)
 
     LCD_init();
     LCD_clear();
-
     LCD_write_string(0x0102, "CDHIGH设计");
     //画框，演示读ST7920，只有并行模式能读ST7920
     #if LCD_INTERFACE != MODE_SERIAL
