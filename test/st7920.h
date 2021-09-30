@@ -1,4 +1,4 @@
-//ST7290 LCD library 六线驱动，使用AVR GCC编译
+//ST7920 LCD 驱动，使用AVR GCC编译
 //Author: cdhigh <2021-09-22>
 //ST7920的绘图结构：左上角为坐标原点，写入的字节表示从某个坐标开始的8个横向像素，
 //每行 128/8=16 个字节，每个字节左边为最低位，右边为最高位，纵向64行。
@@ -26,7 +26,12 @@
 #define LCD_SCLK_PORT    PORTB  //SCLK=E
 #define LCD_SCLK_PIN     1
 
+//8位模式
+#define LCD_DATA_DDR     DDRB
+#define LCD_DATA_PIN     PINB
 #define LCD_DATA_PORT    PORTB
+
+//8/4bit公用
 #define LCD_RS_PORT      PORTD
 #define LCD_RS_PIN       2
 #define LCD_EN_PORT      PORTD
@@ -34,24 +39,27 @@
 #define LCD_RW_PORT      PORTD
 #define LCD_RW_PIN       1
 
-//四位模式
-#define LCD_DATA_PORT_D7 PORTB
-#define LCD_DATA_PORT_D6 LCD_DATA_PORT_D7
-#define LCD_DATA_PORT_D5 LCD_DATA_PORT_D7
-#define LCD_DATA_PORT_D4 LCD_DATA_PORT_D7
+//四位模式，RS/EN/RW使用上面的宏定义
+#define LCD_DATA_PORT_D7 LCD_DATA_PORT
+#define LCD_DATA_PORT_D6 LCD_DATA_PORT
+#define LCD_DATA_PORT_D5 LCD_DATA_PORT
+#define LCD_DATA_PORT_D4 LCD_DATA_PORT
 #define LCD_DATA_PIN_D7  7
 #define LCD_DATA_PIN_D6  6
 #define LCD_DATA_PIN_D5  5
 #define LCD_DATA_PIN_D4  4
 
-#define LCD_EN_high()    LCD_EN_PORT |= (1<<LCD_EN_PIN)
-#define LCD_EN_low()     LCD_EN_PORT &=~(1<<LCD_EN_PIN)
+#define LCD_EN_HIGH()      LCD_EN_PORT |= (1<<LCD_EN_PIN)
+#define LCD_EN_LOW()       LCD_EN_PORT &=~(1<<LCD_EN_PIN)
 
-#define LCD_CMD_mode()     LCD_RS_PORT &=~(1<<LCD_RS_PIN)
-#define LCD_DATA_mode()    LCD_RS_PORT |= (1<<LCD_RS_PIN)
+#define LCD_CMD_MODE()     LCD_RS_PORT &=~(1<<LCD_RS_PIN)
+#define LCD_DATA_MODE()    LCD_RS_PORT |= (1<<LCD_RS_PIN)
 
-#define LCD_RW_high()    LCD_RW_PORT |= (1<<LCD_RW_PIN)
-#define LCD_RW_low()     LCD_RW_PORT &=~(1<<LCD_RW_PIN)
+#define LCD_RW_HIGH()      LCD_RW_PORT |= (1<<LCD_RW_PIN)
+#define LCD_RW_LOW()       LCD_RW_PORT &=~(1<<LCD_RW_PIN)
+
+#define LCD_DATA_DDR_OUTPUT()  LCD_DATA_DDR = 0xff
+#define LCD_DATA_DDR_INPUT()   LCD_DATA_DDR = 0x00
 
 void LCD_clear(void);
 void LCD_init(void);
@@ -72,6 +80,10 @@ void LCD_set_text_address(unsigned int rowCol);
 void LCD_set_graphic_address(unsigned char x, unsigned char y);
 void LCD_write_char(unsigned int rowCol, unsigned int code);
 void LCD_write_string(unsigned int rowCol, const char * p);
+
+#if LCD_INTERFACE != MODE_SERIAL
+void LCD_write_dot(unsigned char x, unsigned char y);
+#endif
 
 #define BYTE_BIT(bitno) (1 << (bitno))
 #define TEST_BIT(value, bitno) ((1 << (bitno)) & (value))

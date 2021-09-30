@@ -57,6 +57,10 @@ int main(void)
 {
     unsigned char row, prevRow;
 
+#if LCD_INTERFACE != MODE_SERIAL
+    unsigned char x, y;
+#endif
+
     DDRD = 0xff;
     PORTD = 0x00;
     DDRB = 0xff;
@@ -68,6 +72,21 @@ int main(void)
     LCD_clear();
 
     LCD_write_string(0x0102, "CDHIGH设计");
+    //画框，演示读ST7920，只有并行模式能读ST7920
+    #if LCD_INTERFACE != MODE_SERIAL
+        for (x = 31 - 3; x <= 112 + 3; x++)
+        {
+            LCD_write_dot(x, 16 - 3);
+            LCD_write_dot(x, 31 + 3);
+            //_delay_us(100);
+        }
+        for (y = 16 - 3; y <= 31 + 3; y++)
+        {
+            LCD_write_dot(31 - 3, y);
+            LCD_write_dot(112 + 3, y);
+            //_delay_us(100);
+        }
+    #endif
     _delay_ms(200);
     LCD_clear();
 

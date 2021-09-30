@@ -4,6 +4,8 @@
 //初始化
 void LCD_init(void)
 {
+    LCD_DATA_DDR_OUTPUT();
+
     _delay_ms(50);
     LCD_write_command(0x33);
     _delay_ms(1);
@@ -36,7 +38,7 @@ void LCD_write_command(unsigned char command)
     asm("nop");
     LCD2_spi_write_byte_standard(command);
 #else
-    LCD_CMD_mode();   //RS=0
+    LCD_CMD_MODE();   //RS=0
     LCD_write_byte(command);
     _delay_ms(1);
 #endif
@@ -51,7 +53,7 @@ void LCD_write_data(unsigned char data)
     asm("nop");
     LCD2_spi_write_byte_standard(data);
 #else
-    LCD_DATA_mode();    //RS=1
+    LCD_DATA_MODE();    //RS=1
     LCD_write_byte(data);
 #endif
 }
@@ -61,16 +63,16 @@ void LCD_write_byte(unsigned char data)
 {
 #if LCD_INTERFACE == MODE_4BIT
     LCD_write_half_byte(data);
-    byte <<= 4;
+    data <<= 4;
     LCD_write_half_byte(data);
 #else
     LCD_DATA_PORT = data;
-    LCD_RW_low();
-    LCD_EN_high();     //EN端产生一个由低电平变高电平，写LCD
+    LCD_RW_LOW();
+    LCD_EN_HIGH();     //EN端产生一个由低电平变高电平，写LCD
     _delay_us(10);
-    LCD_EN_low();      //EN端产生一个由高电平变低电平，写LCD
+    LCD_EN_LOW();      //EN端产生一个由高电平变低电平，写LCD
     _delay_us(10);
-    LCD_RW_high();
+    LCD_RW_HIGH();
 #endif
 }
 
@@ -97,12 +99,12 @@ void LCD_write_half_byte(unsigned char half_byte)
     else
         CLR_BIT(LCD_DATA_PORT_D4, LCD_DATA_PIN_D4);
     
-    LCD_RW_low();
-    LCD_EN_high();         //EN端产生一个由低电平变高电平，写LCD
+    LCD_RW_LOW();
+    LCD_EN_HIGH();         //EN端产生一个由低电平变高电平，写LCD
     _delay_us(10);
-    LCD_EN_low();          //EN端产生一个由高电平变低电平，写LCD
+    LCD_EN_LOW();          //EN端产生一个由高电平变低电平，写LCD
     _delay_us(10); 
-    LCD_RW_high();
+    LCD_RW_HIGH();
 }
 
 //串行模式下写一个字节
@@ -136,11 +138,12 @@ void LCD2_spi_write_byte_standard(unsigned char data)
 unsigned char LCD_read_data(void)
 {
     unsigned char data;
-    LCD_DATA_mode();
+
+    LCD_DATA_MODE();
     data = LCD_read_byte();
 
 #if LCD_INTERFACE == MODE_4BIT
-    data = (data & 0xf0) | (LCD_read_byte() >> 4) & 0x0f;
+    data = (data & 0xf0) | ((LCD_read_byte() >> 4) & 0x0f);
 #endif
     return data;
 }
@@ -148,26 +151,30 @@ unsigned char LCD_read_data(void)
 //并口模式下读状态
 unsigned char LCD_read_status(void)
 {
-    LCD_CMD_mode();
-    return LCD_read_byte();
+    unsigned char data;
+    LCD_CMD_MODE();
+    data = LCD_read_byte();
+#if LCD_INTERFACE == MODE_4BIT
+    data = (data & 0xf0) | ((LCD_read_byte() >> 4) & 0x0f);
+#endif
+    return data;
 }
 
-//并口模式下读一个字节
+//并口模式下读一个字节，如果是4bit模式，则只有高4位是有效的
 unsigned char LCD_read_byte(void)
 {
     unsigned char data;
-
-    LCD_RW_high();
-
-    LCD_EN_low();         //EN端产生上升沿，ST7920开始输出数据
+    LCD_DATA_DDR_INPUT();
+    LCD_RW_HIGH();
+    
+    LCD_EN_LOW();         //EN端产生上升沿，ST7920开始输出数据
     _delay_us(10);
-    LCD_EN_high();
+    LCD_EN_HIGH();
     _delay_us(10);
 
-    data = LCD_DATA_PORT_D7;
-
-    LCD_EN_low();
-
+    data = LCD_DATA_PIN;
+    LCD_EN_LOW();
+    LCD_DATA_DDR_OUTPUT();
     return data;
 }
 
@@ -232,6 +239,7 @@ void LCD_clear(void)
     LCD_write_command(0x01);  //清DDRAM
 
     //清GDRAM,12864仅用了一半的GDRAM，清一半即可
+    //如果没有使用到绘图GDRAM，也可以不清GDRAM，省点时间和代码空间
     LCD_startGraphic();
     for (y = 0; y < 32; y++)
     {
@@ -278,6 +286,7 @@ void LCD_endGraphic(void)
 //col (LOW_BYTE(rowCol)): 列号，0-7
 //charNum: 要反白的字符数量，注意不要超过行末
 //ST7920内置的反白作用不大，它只能整行反白，而且反白第一行，第三行也会一起反白
+//所以此函数使用另外的方法实现：绘图区对应的位全部写0xff，异或后即可反白
 void LCD_Inverse_16X16(unsigned int rowCol, unsigned char charNum, unsigned char reverse)
 {
     unsigned char i, ch;
@@ -326,3 +335,34 @@ void LCD_write_string(unsigned int rowCol, const char * p)
         p++;
     }
 }
+
+//只有并行接口能读ST7920，如果串行接口需要打点，则需要开辟RAM缓冲区
+#if LCD_INTERFACE != MODE_SERIAL
+//在对应X/Y位置显示一个点
+void LCD_write_dot(unsigned char x, unsigned char y)
+{
+    unsigned char xBit, high, low;
+
+    xBit = x & 0x0f;
+    LCD_startGraphic();
+    LCD_set_graphic_address(x, y);
+    LCD_read_data();    //根据手册，设置完地址后的第一次读操作返回的数据无效
+
+    high = LCD_read_data();
+    low = LCD_read_data();
+
+    //回写
+    LCD_set_graphic_address(x, y);
+    if (xBit < 8)   //低8位
+    {
+        LCD_write_data(high | (0x01 << (7 - xBit)));
+        LCD_write_data(low);
+    }
+    else
+    {
+        LCD_write_data(high);
+        LCD_write_data(low | (0x01 << (15 - xBit)));
+    }
+    LCD_endGraphic();
+}
+#endif
