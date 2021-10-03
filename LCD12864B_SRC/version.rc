@@ -1,5 +1,5 @@
 1 VERSIONINFO
- FILEVERSION 1,0,2,1
+ FILEVERSION 1,0,3,1
  PRODUCTVERSION 1,0,0,1
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
@@ -16,7 +16,7 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "LCD12864B ST7920 proteus vsm model"
-            VALUE "FileVersion", "1, 0, 2, 1"
+            VALUE "FileVersion", "1, 0, 3, 1"
             VALUE "InternalName", "LCD12864B proteus vsm model"
             VALUE "LegalCopyright", "Copyright (C) 2021 cdhigh"
             VALUE "OriginalFilename", "LCD12864B.dll"
