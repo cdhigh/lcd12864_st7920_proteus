@@ -83,6 +83,13 @@ jobs:
           }
 
           # 按 release 目录的结构打包: 32位放 MODELS, 64位放 MODELS64, 库文件通用
+          # LIBRARY 是原理图符号/器件定义, 属于必需的源资产, 缺失时明确报错
+          if (-not (Test-Path 'release\LIBRARY\LCD7920.IDX') -or
+              -not (Test-Path 'release\LIBRARY\LCD7920.LIB')) {
+              throw 'release/LIBRARY/LCD7920.IDX or LCD7920.LIB is missing. ' +
+                    'These library files are required assets (schematic symbol definitions) ' +
+                    'and cannot be built by CI. Please restore them to the repository.'
+          }
           $stage = 'package'
           New-Item -ItemType Directory -Force -Path "$stage\MODELS", "$stage\MODELS64", "$stage\LIBRARY" | Out-Null
           Copy-Item $x86dll "$stage\MODELS\LCD12864B.dll" -Force
