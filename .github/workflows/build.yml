@@ -1,10 +1,7 @@
 name: Build LCD12864B DLL
 
 # 一键编译 x86 和 x64 的模型 DLL。
-# 触发方式:
-#   1. Actions 页面手动运行 (workflow_dispatch)
-#   2. 推送 LCD12864B_SRC 源码到 main 分支
-#   3. 发布 release 时自动编译,并把压缩包挂到 release 资产
+# 触发方式: 仅手动触发 —— 仓库 Actions 页面选择本工作流, 点击 Run workflow。
 #
 # 说明: GitHub 托管 runner 上没有 VS2012 (v110 工具集),
 #       这里用命令行覆盖为 VS2022 的 v143 工具集, 不改动工程文件,
@@ -13,16 +10,6 @@ name: Build LCD12864B DLL
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'LCD12864B_SRC/**'
-      - '.github/workflows/**'
-  release:
-    types: [ published ]
-
-permissions:
-  contents: write
 
 jobs:
   build:
@@ -112,9 +99,3 @@ jobs:
           name: LCD12864B-dll
           path: LCD12864B-binaries-*.zip
           if-no-files-found: error
-
-      - name: Attach zip to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: LCD12864B-binaries-*.zip
