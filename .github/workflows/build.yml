@@ -1,0 +1,120 @@
+name: Build LCD12864B DLL
+
+# 一键编译 x86 和 x64 的模型 DLL。
+# 触发方式:
+#   1. Actions 页面手动运行 (workflow_dispatch)
+#   2. 推送 LCD12864B_SRC 源码到 main 分支
+#   3. 发布 release 时自动编译,并把压缩包挂到 release 资产
+#
+# 说明: GitHub 托管 runner 上没有 VS2012 (v110 工具集),
+#       这里用命令行覆盖为 VS2022 的 v143 工具集, 不改动工程文件,
+#       本地仍然可以用 VS2012 及以上版本正常打开和编译。
+#       Release 配置使用静态 CRT (/MT), 产出的 DLL 不依赖 VC 运行库。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'LCD12864B_SRC/**'
+      - '.github/workflows/**'
+  release:
+    types: [ published ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build DLL (x86 / Win32)
+        shell: cmd
+        run: msbuild LCD12864B_SRC\LCD12864B.sln /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /p:OutDir=${{ github.workspace }}\out\x86\ /p:IntDir=${{ github.workspace }}\out\obj\x86\
+
+      - name: Build DLL (x64)
+        shell: cmd
+        run: msbuild LCD12864B_SRC\LCD12864B.sln /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /p:OutDir=${{ github.workspace }}\out\x64\ /p:IntDir=${{ github.workspace }}\out\obj\x64\
+
+      - name: Verify bitness, exports and collect files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $x86dll = 'out\x86\LCD12864B.dll'
+          $x64dll = 'out\x64\LCD12864B.dll'
+          if (-not (Test-Path $x86dll)) { throw "x86 DLL not found: $x86dll" }
+          if (-not (Test-Path $x64dll)) { throw "x64 DLL not found: $x64dll" }
+
+          # 校验 PE 头的机器类型 (0x014C = x86, 0x8664 = x64)
+          function Get-PeMachine([string]$path) {
+              $fs = [System.IO.File]::OpenRead((Resolve-Path $path).Path)
+              try {
+                  $br = New-Object System.IO.BinaryReader($fs)
+                  $null = $fs.Seek(0x3C, 'Begin')
+                  $peOff = $br.ReadInt32()
+                  $null = $fs.Seek($peOff + 4, 'Begin')
+                  return $br.ReadUInt16()
+              } finally {
+                  $br.Dispose()
+                  $fs.Dispose()
+              }
+          }
+
+          $m32 = Get-PeMachine $x86dll
+          $m64 = Get-PeMachine $x64dll
+          Write-Host ("x86 machine = 0x{0:X4}, x64 machine = 0x{1:X4}" -f $m32, $m64)
+          if ($m32 -ne 0x014C) { throw ("x86 DLL has wrong machine type: 0x{0:X4}" -f $m32) }
+          if ($m64 -ne 0x8664) { throw ("x64 DLL has wrong machine type: 0x{0:X4}" -f $m64) }
+
+          # 校验四个 VSM 导出函数是否存在
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vsPath = & $vswhere -latest -products * -property installationPath
+          $dumpbin = Get-ChildItem (Join-Path $vsPath 'VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe') |
+                     Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dumpbin) { throw 'dumpbin.exe not found' }
+
+          foreach ($dll in @($x86dll, $x64dll)) {
+              $exports = (& $dumpbin /EXPORTS $dll) -join "`n"
+              foreach ($fn in @('createactivemodel', 'createdsimmodel', 'deleteactivemodel', 'deletedsimmodel')) {
+                  if ($exports -notmatch $fn) { throw "$dll is missing export: $fn" }
+              }
+              Write-Host "$dll exports OK"
+          }
+
+          # 从 version.rc 读取版本号 (形如 1,0,3,1 -> 1.0.3)
+          $rc = Get-Content 'LCD12864B_SRC\version.rc' -Raw
+          if ($rc -match 'FILEVERSION\s+(\d+)\s*,\s*(\d+)\s*,\s*(\d+)') {
+              $ver = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
+          } else {
+              $ver = 'dev'
+          }
+
+          # 按 release 目录的结构打包: 32位放 MODELS, 64位放 MODELS64, 库文件通用
+          $stage = 'package'
+          New-Item -ItemType Directory -Force -Path "$stage\MODELS", "$stage\MODELS64", "$stage\LIBRARY" | Out-Null
+          Copy-Item $x86dll "$stage\MODELS\LCD12864B.dll" -Force
+          Copy-Item $x64dll "$stage\MODELS64\LCD12864B.dll" -Force
+          Copy-Item 'release\LIBRARY\*' "$stage\LIBRARY\" -Force
+
+          $zip = "LCD12864B-binaries-$ver.zip"
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          Write-Host "Packaged: $zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LCD12864B-dll
+          path: LCD12864B-binaries-*.zip
+          if-no-files-found: error
+
+      - name: Attach zip to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LCD12864B-binaries-*.zip
